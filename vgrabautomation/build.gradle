@@ -1,0 +1,126 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+import org.gradle.util.Clock
+
+description = 'Builds Node modules for util tests'
+
+buildscript {
+    repositories {
+        maven { url "https://plugins.gradle.org/m2/" }
+    }
+
+   dependencies {
+        classpath 'com.moowork.gradle:gradle-gulp-plugin:0.12'
+        classpath ("com.moowork.gradle:gradle-node-plugin:0.12")
+   }
+}
+
+apply plugin: 'com.moowork.gulp'
+
+
+//********************    NODE CONFIGURATIONS   ***********************//
+// set node config
+node {
+    // Version of node to use.
+    version = '0.10.32'
+
+    // Version of npm to use.
+    npmVersion = '3.3.5'
+
+    // Base URL for fetching node distributions (change if you have a mirror).
+    distBaseUrl = 'https://nodejs.org/dist'
+
+    // If true, it will download node using above parameters.
+    // If false, it will try to use globally installed node.
+    download = true
+
+    // Set the work directory for unpacking node
+    workDir = file("${project.projectDir}")
+
+    // Set the work directory where node_modules should be located
+    nodeModulesDir = file("${project.projectDir}")
+}
+
+npm_install.dependsOn(npm_cache_clean)
+
+task initProject() {
+
+}
+
+task installExpress(type: NpmTask) {
+  // install the express package only
+  args = ['install', '--prefix build/node ', 'build/node']
+}
+
+task npmCacheConfig(type: NpmTask) {
+    description = "Configure the NPM cache"
+    def npmCacheDir = "${gradle.getGradleUserHomeDir()}/caches/npm"
+    outputs.files file(npmCacheDir)
+    args = [ 'config', 'set', 'cache', npmCacheDir ]
+}
+
+task npmPackages(type: NpmTask, dependsOn: npmCacheConfig) {
+    description = "Install Node.js packages"
+    args = [ 'install' ]
+    inputs.files file('package.json')
+    outputs.files file('node_modules')
+}
+
+task setNpmHttpProxy( type:Exec ) {
+    commandLine execOnOS( "npm config set proxy " + System.properties['http.fullProxyHost'], false)
+}
+
+task setNpmHttpsProxy(type:Exec) {
+    commandLine execOnOS( 'npm config set https-proxy ' + System.properties['http.fullProxyHost'], false )
+}
+
+task requirejs(type: GruntTask) {
+    gruntArgs = "requirejs"
+}
+
+task jslint(type: GruntTask) {
+    gruntArgs = "lint"
+}
+
+// Sets Npm's proxy
+task setNpmProxy(dependsOn: [setNpmHttpProxy,setNpmHttpsProxy]) {
+    println "configuring npm proxies..."
+}
+
+// used to handle all exec command
+// (command) - actual command
+// (spawn) - spawned task or not
+def execOnOS(command, spawn){
+    def osPrompt = Os.isFamily(Os.FAMILY_WINDOWS) ? "cmd" : "bash"
+    def osTrig = Os.isFamily(Os.FAMILY_WINDOWS) ? "/c" : "-c"
+    def str = new LinkedList <String> ();
+    str.add(osPrompt)
+    str.add(osTrig)
+    str.add(command)
+    if(spawn){
+        str.add(Os.isFamily(Os.FAMILY_WINDOWS) ? "" : "/dev/null 2>&1 &")
+    }
+    println ('execOnOS: '+str)
+    return str.toArray()
+}
+
+class GruntTask extends Exec {
+    private String gruntExecutable = Os.isFamily(Os.FAMILY_WINDOWS) ? "grunt.cmd" : "grunt"
+    private String switches = "--no-color"
+
+    String gruntArgs = ""
+
+    public GruntTask() {
+        super()
+        this.setExecutable(gruntExecutable)
+    }
+
+    public void setGruntArgs(String gruntArgs) {
+        this.args = "$switches $gruntArgs".trim().split(" ") as List
+    }
+}
+
+
+
+
+
+

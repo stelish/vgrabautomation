@@ -1,0 +1,8 @@
+
+To run cucumber from command line:
+
+node_modules\.bin\cucumber-js
+
+OR
+
+npm test
